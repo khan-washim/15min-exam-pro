@@ -1,0 +1,23 @@
+[
+  {
+    "subject": "bangla",
+    "setNumber": 1,
+    "text": "বাংলা সাহিত্যের প্রথম উপন্যাস কোনটি?",
+    "options": ["কাব্যগ্রন্থ", "পদ্যাবলী", "মহাকাব্য", "চর্যাপদ"],
+    "correctIndex": 2
+  },
+  {
+    "subject": "english",
+    "setNumber": 1,
+    "text": "What is the synonym of 'Beautiful'?",
+    "options": ["Ugly", "Pretty", "Dark", "Dull"],
+    "correctIndex": 1
+  },
+  {
+    "subject": "math",
+    "setNumber": 1,
+    "text": "If x + 5 = 10, what is x?",
+    "options": ["2", "5", "10", "0"],
+    "correctIndex": 1
+  }
+]

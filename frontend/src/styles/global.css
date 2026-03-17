@@ -1,0 +1,9 @@
+:root {
+  --primary: #4f46e5;
+  --primary-dark: #4338ca;
+  --bg-light: #f3f4f6;
+}
+body { background-color: var(--bg-light); font-family: 'Segoe UI', sans-serif; }
+.landing-page { background-color: #0f172a; color: white; }
+.animate-fade-in { animation: fadeIn 0.5s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

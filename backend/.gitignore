@@ -1,0 +1,14 @@
+# Dependency directory
+node_modules/
+
+# Environment variables (খুবই গুরুত্বপূর্ণ, সিকিউরিটির জন্য)
+.env
+
+# Local logs
+*.log
+
+# Uploaded files (যদি ইউজার কোনো ফাইল আপলোড করে)
+uploads/
+
+# IDE files
+.vscode/
