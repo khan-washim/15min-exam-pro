@@ -1,6 +1,6 @@
-import { createContext, useState, useContext, useEffect, useRef } from 'react';
+import { createContext, useState, useContext, useEffect, useRef, useCallback } from 'react';
 
-const ExamContext = createContext();
+const ExamContext = createContext(null);
 
 export const ExamProvider = ({ children }) => {
   const [examState, setExamState] = useState({
@@ -10,13 +10,15 @@ export const ExamProvider = ({ children }) => {
     currentIndex: 0,
     timeLeft: 0,
     isActive: false,
-    isSubmitted: false
+    isSubmitted: false,
+    isAutoSubmitted: false
   });
 
   const timerRef = useRef(null);
 
+  // ✅ Fix: dependency থেকে examState.timeLeft সরানো হয়েছে
   useEffect(() => {
-    if (examState.isActive && examState.timeLeft > 0) {
+    if (examState.isActive) {
       timerRef.current = setInterval(() => {
         setExamState(prev => {
           if (prev.timeLeft <= 1) {
@@ -30,9 +32,10 @@ export const ExamProvider = ({ children }) => {
       clearInterval(timerRef.current);
     }
     return () => clearInterval(timerRef.current);
-  }, [examState.isActive, examState.timeLeft]);
+  }, [examState.isActive]); // ✅ শুধু isActive
 
-  const startExam = (sessionId, questions, durationMinutes = 15) => {
+  const startExam = useCallback((sessionId, questions, durationMinutes = 15) => {
+    clearInterval(timerRef.current);
     setExamState({
       sessionId,
       questions,
@@ -40,63 +43,74 @@ export const ExamProvider = ({ children }) => {
       currentIndex: 0,
       timeLeft: durationMinutes * 60,
       isActive: true,
-      isSubmitted: false
+      isSubmitted: false,
+      isAutoSubmitted: false
     });
-  };
+  }, []);
 
-  const submitAnswer = (questionIndex, optionIndex) => {
-    if (!examState.isActive) return;
-    setExamState(prev => ({
-      ...prev,
-      answers: { ...prev.answers, [questionIndex]: optionIndex }
-    }));
-  };
+  const endExam = useCallback(() => {
+    clearInterval(timerRef.current);
+    setExamState(prev => ({ ...prev, isActive: false }));
+  }, []);
 
-  // রেজাল্ট ক্যালকুলেট করার নতুন ফাংশন
-  const calculateResult = () => {
-    let correctCount = 0;
+  const submitAnswer = useCallback((questionIndex, optionIndex) => {
+    setExamState(prev => {
+      if (!prev.isActive) return prev;
+      return { ...prev, answers: { ...prev.answers, [questionIndex]: optionIndex } };
+    });
+  }, []);
+
+  const calculateResult = useCallback(() => {
     const { questions, answers } = examState;
-
+    let correctCount = 0;
     questions.forEach((q, index) => {
-      // সঠিক ইনডেক্সের সাথে ইউজারের দেওয়া উত্তরের ইনডেক্স চেক করা
-      if (answers[index] === q.correctIndex) {
-        correctCount++;
-      }
+      if (answers[index] === q.correctIndex) correctCount++;
     });
-
     return {
       total: questions.length,
       correct: correctCount,
-      score: correctCount * 1 // প্রতি প্রশ্নে ১ মার্ক
+      score: correctCount
     };
-  };
+  }, [examState]);
 
-  const nextQuestion = () => 
-    setExamState(p => ({ ...p, currentIndex: Math.min(p.currentIndex + 1, p.questions.length - 1) }));
+  const nextQuestion = useCallback(() =>
+    setExamState(p => ({
+      ...p, currentIndex: Math.min(p.currentIndex + 1, p.questions.length - 1)
+    })), []);
 
-  const prevQuestion = () => 
-    setExamState(p => ({ ...p, currentIndex: Math.max(p.currentIndex - 1, 0) }));
+  const prevQuestion = useCallback(() =>
+    setExamState(p => ({
+      ...p, currentIndex: Math.max(p.currentIndex - 1, 0)
+    })), []);
 
-  const formatTime = () => {
+  const formatTime = useCallback(() => {
     const minutes = Math.floor(examState.timeLeft / 60);
     const seconds = examState.timeLeft % 60;
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
-  };
+  }, [examState.timeLeft]);
 
   return (
-    <ExamContext.Provider value={{ 
-      examState, 
-      startExam, 
-      submitAnswer, 
-      nextQuestion, 
-      prevQuestion, 
+    <ExamContext.Provider value={{
+      examState,
+      startExam,
+      endExam,
+      submitAnswer,
+      nextQuestion,
+      prevQuestion,
       formatTime,
-      calculateResult, // এক্সপোর্ট করা হলো
-      setExamState 
+      calculateResult,
+      setExamState
     }}>
       {children}
     </ExamContext.Provider>
   );
 };
 
-export const useExam = () => useContext(ExamContext);
+// ✅ Fix: null check যোগ করা হয়েছে — এটাই red error fix করে
+export const useExam = () => {
+  const context = useContext(ExamContext);
+  if (!context) {
+    throw new Error('useExam must be used within an ExamProvider');
+  }
+  return context;
+};
