@@ -3,7 +3,6 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import mongoSanitize from 'express-mongo-sanitize';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -54,7 +53,7 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// Stricter rate limit for auth routes (brute-force protection)
+// Stricter rate limit for auth routes
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
@@ -66,11 +65,35 @@ const authLimiter = rateLimit({
 app.use('/api/auth', authLimiter);
 
 // ─────────────────────────────────────────────
-// ✅ Body Parsing & Sanitization Middleware
+// ✅ Body Parsing & Manual Sanitization
 // ─────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-app.use(mongoSanitize());
+
+/**
+ * Custom NoSQL Injection Sanitization
+ * Replaces express-mongo-sanitize to avoid "Getter/Setter" property errors
+ */
+app.use((req, res, next) => {
+  const sanitize = (obj) => {
+    if (obj instanceof Object) {
+      for (let key in obj) {
+        if (key.startsWith('$') || key.includes('.')) {
+          delete obj[key];
+        } else if (obj[key] instanceof Object) {
+          sanitize(obj[key]);
+        }
+      }
+    }
+    return obj;
+  };
+
+  if (req.body) sanitize(req.body);
+  if (req.query) sanitize(req.query);
+  if (req.params) sanitize(req.params);
+
+  next();
+});
 
 // ─────────────────────────────────────────────
 // ✅ Static Files
@@ -103,7 +126,7 @@ app.get('/', (req, res) => {
 });
 
 // ─────────────────────────────────────────────
-// ✅ 404 Handler — unknown routes
+// ✅ 404 Handler
 // ─────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
@@ -144,33 +167,21 @@ app.use((err, req, res, next) => {
 });
 
 // ─────────────────────────────────────────────
-// ✅ Start Server with Graceful Shutdown
+// ✅ Start Server
 // ─────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-
 const server = app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT} [${process.env.NODE_ENV || 'development'}]`);
 });
 
-// Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('❌ UNHANDLED REJECTION:', err.message);
   server.close(() => process.exit(1));
 });
 
-// Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
   console.error('❌ UNCAUGHT EXCEPTION:', err.message);
   process.exit(1);
-});
-
-// Graceful shutdown on SIGTERM
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received. Shutting down gracefully...');
-  server.close(() => {
-    console.log('✅ Server closed.');
-    process.exit(0);
-  });
 });
 
 export default app;
